@@ -1,0 +1,71 @@
+
+footer { position: relative; z-index: 1; }
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 52px; height: 76px;
+  background: rgba(13,12,10,0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(201,168,76,0.15);
+}
+.nav-logo img { height: 48px; width: auto; object-fit: contain; }
+.nav-links { display: flex; gap: 40px; list-style: none; }
+.nav-links a {
+  color: var(--white); text-decoration: none;
+  font-family: var(--sf); font-size: 13px; font-weight: 500;
+  letter-spacing: 3px; text-transform: uppercase;
+  opacity: 0.65; transition: opacity .2s, color .2s;
+}
+.nav-links a:hover { opacity: 1; color: var(--gold); }
+.nav-cta {
+  background: var(--gold); color: var(--black);
+  padding: 11px 28px;
+  font-family: var(--sf); font-size: 12px; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase;
+  text-decoration: none; transition: background .2s;
+}
+.nav-cta:hover { background: var(--gold2); }
+
+/* ── HERO (full-screen bg, estilo v1 + elementos v2) ── */
+/* ── HERO: split screen ── */
+.hero {
+  position: relative; height: 100vh; min-height: 640px;
+  display: flex; flex-direction: row; align-items: stretch;
+  overflow: hidden;
+  background: var(--black);
+}
+
+/* ── painel esquerdo 60%: texto ── */
+.hero-left {
+  flex: 0 0 45%;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 40px 0 8%;
+  position: relative; z-index: 4;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255,255,255,0.03) 2px,
+      rgba(255,255,255,0.03) 4px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 2px,
+      rgba(255,255,255,0.03) 2px,
+      rgba(255,255,255,0.03) 4px
+    ),
+    #0a0a0a;
+}
+
+
+/* ── painel direito 40%: imagem ── */
+.hero-right {
+  flex: 0 0 55%;
+  position: relative; overflow: hidden;
+}
+.hero-right::after {
+  content: '';

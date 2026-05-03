@@ -1,0 +1,90 @@
+<!-- SERVIÇOS -->
+<section class="servicos" id="servicos">
+  <div class="section-sep"></div>
+  <div class="sec-inner">
+    <div class="sec-tag">O que fazemos</div>
+    <h2 class="sec-h2">Nossos <em style="color:var(--gold);font-style:normal;">Serviços</em></h2>
+    <!-- Masculino -->
+    <div class="serv-category-label">
+      <span class="scl-line"></span>
+      <span class="scl-text">Masculino</span>
+      <span class="scl-line"></span>
+    </div>
+    <div class="serv-grid">
+      <div class="serv-card"><div class="serv-num">01</div><div class="serv-name">Corte de Cabelo</div><div class="serv-desc">Degradê, navalhado, social ou moderno — executado com precisão e estilo único.</div><div class="serv-price">R$ 35 <small>em diante</small></div><div class="serv-dur">45 minutos</div><a class="serv-agendar" href="#agendamento" onclick="agendarServico('Corte de Cabelo','35','45');return false;">Agendar</a></div>
+      <div class="serv-card"><div class="serv-num">02</div><div class="serv-name">Barba</div><div class="serv-desc">Modelagem, aparação e hidratação com produtos premium para uma barba impecável.</div><div class="serv-price">R$ 25 <small>em diante</small></div><div class="serv-dur">30 minutos</div><a class="serv-agendar" href="#agendamento" onclick="agendarServico('Barba','25','30');return false;">Agendar</a></div>
+      <div class="serv-card"><div class="serv-num">03</div><div class="serv-name">Corte + Barba</div><div class="serv-desc">A combinação perfeita. Transformação completa do visual em uma única sessão.</div><div class="serv-price">R$ 55 <small>em diante</small></div><div class="serv-dur">70 minutos</div><a class="serv-agendar" href="#agendamento" onclick="agendarServico('Corte + Barba','55','70');return false;">Agendar</a></div>
+      <div class="serv-card"><div class="serv-num">04</div><div class="serv-name">Lavagem</div><div class="serv-desc">Lavagem com shampoo profissional e massagem capilar na poltrona exclusiva.</div><div class="serv-price">R$ 15 <small>em diante</small></div><div class="serv-dur">20 minutos</div><a class="serv-agendar" href="#agendamento" onclick="agendarServico('Lavagem','15','20');return false;">Agendar</a></div>
+      <div class="serv-card"><div class="serv-num">05</div><div class="serv-name">Pigmentação</div><div class="serv-desc">Cobertura de fios brancos com produtos de alta performance para resultado natural.</div><div class="serv-price">R$ 45 <small>em diante</small></div><div class="serv-dur">50 minutos</div><a class="serv-agendar" href="#agendamento" onclick="agendarServico('Pigmentação','45','50');return false;">Agendar</a></div>
+      <div class="serv-card"><div class="serv-num">06</div><div class="serv-name">Pacote VIP</div><div class="serv-desc">Corte + barba + lavagem + hidratação + sobrancelha. Experiência premium completa.</div><div class="serv-price">R$ 85 <small>em diante</small></div><div class="serv-dur">90 minutos</div><a class="serv-agendar" href="#agendamento" onclick="agendarServico('Pacote VIP','85','90');return false;">Agendar</a></div>
+    </div>
+
+    <!-- Divisor -->
+    <div class="serv-divider">
+      <div class="serv-divider-line"></div>
+      <div class="serv-divider-ornament">
+        <svg viewBox="0 0 60 20" fill="none" xmlns="http://www.w3.org/2000/svg" width="60" height="20">
+          <line x1="0" y1="10" x2="20" y2="10" stroke="#7a6020" stroke-width="1"></line>
+          <circle cx="30" cy="10" r="4" stroke="#c9a84c" stroke-width="1" fill="none"></circle>
+          <circle cx="30" cy="10" r="1.5" fill="#c9a84c"></circle>
+          <line x1="40" y1="10" x2="60" y2="10" stroke="#7a6020" stroke-width="1"></line>
+        </svg>
+      </div>
+      <div class="serv-divider-line"></div>
+    </div>
+
+    <!-- Feminino -->
+    <div class="serv-category-label">
+      <span class="scl-line"></span>
+      <span class="scl-text">Feminino</span>
+      <span class="scl-line"></span>
+    </div>
+    <div class="serv-grid serv-grid-fem">
+      <div class="serv-card serv-card-fem"><div class="serv-num">01</div><div class="serv-name">Corte Feminino</div><div class="serv-desc">Corte com técnica e sensibilidade — laços, pontas, repique ou transformação total de comprimento.</div><div class="serv-price">R$ 55 <small>em diante</small></div><div class="serv-dur">60 minutos</div><a class="serv-agendar" href="#agendamento" onclick="agendarServico('Corte Feminino','55','60');return false;">Agendar</a></div>
+      <div class="serv-card serv-card-fem"><div class="serv-num">02</div><div class="serv-name">Escova</div><div class="serv-desc">Escova modeladora com brilho, volume e acabamento profissional duradouro.</div><div class="serv-price">R$ 45 <small>em diante</small></div><div class="serv-dur">50 minutos</div><a class="serv-agendar" href="#agendamento" onclick="agendarServico('Escova','45','50');return false;">Agendar</a></div>
+      <div class="serv-card serv-card-fem"><div class="serv-num">03</div><div class="serv-name">Progressiva</div><div class="serv-desc">Alisamento progressivo com produtos de alta qualidade para fios lisos e saudáveis.</div><div class="serv-price">R$ 150 <small>em diante</small></div><div class="serv-dur">120 minutos</div><a class="serv-agendar" href="#agendamento" onclick="agendarServico('Progressiva','150','120');return false;">Agendar</a></div>
+      <div class="serv-card serv-card-fem"><div class="serv-num">04</div><div class="serv-name">Hidratação Capilar</div><div class="serv-desc">Tratamento intensivo para recuperar a vitalidade, brilho e maciez dos fios.</div><div class="serv-price">R$ 65 <small>em diante</small></div><div class="serv-dur">60 minutos</div><a class="serv-agendar" href="#agendamento" onclick="agendarServico('Hidratação Capilar','65','60');return false;">Agendar</a></div>
+      <div class="serv-card serv-card-fem"><div class="serv-num">05</div><div class="serv-name">Coloração</div><div class="serv-desc">Coloração completa ou mechas com pigmentos de alta cobertura e durabilidade.</div><div class="serv-price">R$ 90 <small>em diante</small></div><div class="serv-dur">90 minutos</div><a class="serv-agendar" href="#agendamento" onclick="agendarServico('Coloração','90','90');return false;">Agendar</a></div>
+      <div class="serv-card serv-card-fem"><div class="serv-num">06</div><div class="serv-name">Corte + Escova</div><div class="serv-desc">Transformação completa: corte personalizado e escova com acabamento impecável.</div><div class="serv-price">R$ 85 <small>em diante</small></div><div class="serv-dur">90 minutos</div><a class="serv-agendar" href="#agendamento" onclick="agendarServico('Corte + Escova','85','90');return false;">Agendar</a></div>
+
+    <!-- Escolha seu Profissional -->
+    <div class="serv-category-label" style="margin-top:64px;">
+      <span class="scl-line"></span>
+      <span class="scl-text">Escolha seu Profissional</span>
+      <span class="scl-line"></span>
+    </div>
+    <div class="prof-grid">
+      <div class="prof-card" onclick="selecionarProfissional('Pericles')">
+        <div class="prof-num">01</div>
+        <div class="prof-name">Pericles</div>
+        <div class="prof-role">Barbeiro · Fundador</div>
+        <span class="prof-agendar">Agendar</span>
+      </div>
+      <div class="prof-card" onclick="selecionarProfissional('Betina')">
+        <div class="prof-num">02</div>
+        <div class="prof-name">Betina</div>
+        <div class="prof-role">Barbeira</div>
+        <span class="prof-agendar">Agendar</span>
+      </div>
+      <div class="prof-card" onclick="selecionarProfissional('Mary')">
+        <div class="prof-num">03</div>
+        <div class="prof-name">Mary</div>
+        <div class="prof-role">Barbeira</div>
+        <span class="prof-agendar">Agendar</span>
+      </div>
+      <div class="prof-card" onclick="selecionarProfissional('Vitória')">
+        <div class="prof-num">04</div>
+        <div class="prof-name">Vitória</div>
+        <div class="prof-role">Barbeira</div>
+        <span class="prof-agendar">Agendar</span>
+      </div>
+      <div class="prof-card" onclick="selecionarProfissional('Thayna')">
+        <div class="prof-num">05</div>
+        <div class="prof-name">Thayna</div>
+        <div class="prof-role">Barbeira</div>
+        <span class="prof-agendar">Agendar</span>
+      </div>
+    </div>
+    </div>
+  </div>
+</section>

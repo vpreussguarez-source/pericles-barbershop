@@ -1,0 +1,37 @@
+<!-- LOCALIZAÇÃO -->
+<section class="localizacao" id="localizacao">
+  <div class="section-sep"></div>
+  <div class="sec-inner">
+    <div class="sec-tag">Como nos encontrar</div>
+    <h2 class="sec-h2">Nossa <em style="color:var(--gold);font-style:normal;">Localização</em></h2>
+    <div class="gold-bar"></div>
+    <div class="map-container">
+      <iframe src="https://www.google.com/maps?q=R.+Tocantins,+2396,+Centro,+Pato+Branco,+PR,+85501-292&output=embed" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+    </div>
+    <div class="loc-info">
+      <div class="loc-card">
+        <div class="loc-card-title">Endereço</div>
+        <div class="loc-card-text">R. Tocantins, 2396 — Sala 1<br>Centro — Pato Branco, PR<br>CEP 85501-292</div>
+        <a class="loc-card-link" href="https://maps.google.com/?q=R.+Tocantins,+2396,+Pato+Branco,+PR" target="_blank">Abrir no Google Maps →</a>
+      </div>
+      <div class="loc-card">
+        <div class="loc-card-title">Horário de Funcionamento</div>
+        <div class="loc-card-text">Segunda a Sexta<br>08h às 20h<br>Sábado: 08h às 18h<br>Domingo: Fechado</div>
+      </div>
+      <div class="loc-card">
+        <div class="loc-card-title">Contato</div>
+        <div class="loc-card-text">Agendamentos e dúvidas<br>pelo WhatsApp</div>
+        <a class="loc-card-link" href="https://wa.me/5546999999999" target="_blank">Falar via WhatsApp →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-inner">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <img src="991810e6-4e0d-40f6-a49a-8a8a715bfcf0" alt="Pericles Barbershop">
+        <p>Sofisticação

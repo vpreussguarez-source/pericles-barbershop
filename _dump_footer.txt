@@ -1,0 +1,57 @@
+<footer>
+  <div class="foot-inner">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <img src="991810e6-4e0d-40f6-a49a-8a8a715bfcf0" alt="Pericles Barbershop">
+        <p>Sofisticação, cuidado e experiência única para o homem que valoriza o estilo. Venha nos conhecer em Pato Branco.</p>
+      </div>
+      <div class="foot-col">
+        <h5>Horários</h5>
+        <address>Segunda a Sábado<br>08h às 20h<br><br>Domingo: Fechado</address>
+      </div>
+      <div class="foot-col">
+        <h5>Localização</h5>
+        <address>Rua Tocantins, 2396<br>Sala 1 — Centro<br>Pato Branco — PR</address>
+        <a href="https://wa.me/5546999999999" style="color:var(--gold);margin-top:16px;" target="_blank">WhatsApp →</a>
+      </div>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 Pericles Barbershop. Todos os direitos reservados.</span>
+      <div class="soc-links">
+        <a href="#" title="Instagram">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"></path></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+function filterProd(btn, cat) {
+  document.querySelectorAll('.pf').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.prod-card').forEach(card => {
+    if (cat === 'all' || card.dataset.cat === cat) card.classList.remove('hidden');
+    else card.classList.add('hidden');
+  });
+}
+
+
+
+
+// ── Counter animation ────────────────────────────────────────────────────────
+(function() {
+  function animateCounter(el) {
+    const target = parseInt(el.dataset.count, 10);
+    const suffix = el.dataset.suffix || '';
+    const duration = 1800;
+    const frameRate = 60;
+    const totalFrames = Math.round(duration / (1000 / frameRate));
+    let frame = 0;
+    // ease-out: desacelera no final
+    function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+    el.textContent = '0' + suffix;
+    const timer = setInterval(function() {
+      frame++;
+      const progress = easeOut(frame / totalFrames);
+      const current = Math.min(Math.round(progress * target), target);

@@ -1,0 +1,8 @@
+const ATTENDANTS = [
+  { id: 'pericles', name: 'Pericles', role: 'Barbeiro',                   desc: 'Especialista em cortes masculinos, barbearia clássica e tratamentos capilares.' },
+  { id: 'betina',   name: 'Betina',   role: 'Esteticista',                desc: 'Estética facial e corporal, depilação e cuidados com a pele.' },
+  { id: 'mary',     name: 'Mary',     role: 'Micropigmentadora & Terapeuta', desc: 'Micropigmentação de sobrancelhas, olhos e lábios. Terapias corporais.' },
+  { id: 'vitoria',  name: 'Vitória',  role: 'Massoterapeuta',             desc: 'Massagens relaxantes, terapêuticas, drenagem linfática e técnicas especializadas.' },
+  { id: 'thayna',   name: 'Thayna',   role: 'Nutricionista',              desc: 'Avaliação e acompanhamento nutricional personalizado.' },
+];
+

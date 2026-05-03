@@ -1,0 +1,637 @@
+<script type="text/babel">
+
+const { useState, useEffect, useMemo, useCallback } = React;
+
+// ══════════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════════
+
+const timeToMins = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+const minsToTime = m => `${Math.floor(m/60)}:${m%60===0?'00':'30'}`;
+const fmtDuration = mins => {
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins/60), m = mins%60;
+  return m ? `${h}h ${m}min` : `${h}h`;
+};
+
+/** Retorna todos os slots bloqueados por um agendamento (start + duração) */
+const getSlotsNeeded = (startTime, durationMins) => {
+  const start = timeToMins(startTime);
+  if (start + durationMins > 20*60) return []; // ultrapassa horário de fechamento
+  const slots = [];
+  for (let off = 0; off < durationMins; off += 30) slots.push(minsToTime(start + off));
+  return slots;
+};
+
+/** Verifica se um horário de início está disponível dado o conjunto de slots ocupados e a duração total */
+const isAvailable = (startTime, takenSet, durationMins) => {
+  const needed = getSlotsNeeded(startTime, durationMins);
+  if (!needed.length) return false; // ultrapassa 20h
+  return !needed.some(s => takenSet.has(s));
+};
+
+/** Busca slots ocupados no Supabase para atendente + data */
+const loadTakenSlots = async (attendantId, date) => {
+  if (!_sb) {
+    // Modo demo: simula alguns slots ocupados deterministicamente
+    const seed = date.getDate() + date.getMonth() * 31;
+    const taken = new Set();
+    const allSlots = [];
+    for (let h=8;h<20;h++) for (let m of [0,30]) { if(h===19&&m===30)continue; allSlots.push(`${h}:${m===0?'00':'30'}`); }
+    allSlots.forEach(s => { if((seed*(timeToMins(s)+1)*7)%5===0) taken.add(s); });
+    return taken;
+  }
+  const dateStr = date.toISOString().split('T')[0];
+  const { data, error } = await _sb
+    .from('bookings')
+    .select('slots')
+    .eq('attendant_id', attendantId)
+    .eq('date', dateStr)
+    .neq('status', 'cancelled');
+  if (error) { console.error('Supabase read error:', error); return new Set(); }
+  const taken = new Set();
+  data.forEach(b => b.slots.forEach(s => taken.add(s)));
+  return taken;
+};
+
+/** Salva o agendamento no Supabase e dispara o webhook */
+const saveBooking = async (booking, slots, durationMins, totalPrice, serviceNames) => {
+  const dateStr = booking.date.toISOString().split('T')[0];
+  const payload = {
+    attendant_id:   booking.attendant.id,
+    attendant_name: booking.attendant.name,
+    service_names:  serviceNames,
+    date:           dateStr,
+    start_time:     booking.time,
+    slots,
+    duration_mins:  durationMins,
+    client_name:    booking.clientName,
+    client_phone:   booking.clientPhone,
+    total_price:    totalPrice,
+    status:         'pending',
+  };
+
+  if (!_sb) {
+    // Modo demo: simula latência e retorna ID fictício
+    await new Promise(r => setTimeout(r, 900));
+    const demoId = 'demo-' + Math.random().toString(36).slice(2,10).toUpperCase();
+    // Dispara webhook mesmo no demo (se configurado)
+    triggerWebhook({ ...payload, id: demoId });
+    return { ...payload, id: demoId };
+  }
+
+  const { data, error } = await _sb.from('bookings').insert([payload]).select();
+  if (error) throw error;
+  const record = data[0];
+  triggerWebhook(record);
+  return record;
+};
+
+/** Dispara webhook Make / n8n (não bloqueante) */
+const triggerWebhook = (record) => {
+  if (!CONFIG.webhookUrl) return;
+  fetch(CONFIG.webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  }).catch(e => console.warn('Webhook error:', e));
+};
+
+// ══════════════════════════════════════════════════════════════════
+// DATA — atendentes e serviços (com duração em minutos por serviço)
+// ══════════════════════════════════════════════════════════════════
+
+const ATTENDANTS = [
+  { id: 'pericles', name: 'Pericles', role: 'Barbeiro',                   desc: 'Especialista em cortes masculinos, barbearia clássica e tratamentos capilares.' },
+  { id: 'betina',   name: 'Betina',   role: 'Esteticista',                desc: 'Estética facial e corporal, depilação e cuidados com a pele.' },
+  { id: 'mary',     name: 'Mary',     role: 'Micropigmentadora & Terapeuta', desc: 'Micropigmentação de sobrancelhas, olhos e lábios. Terapias corporais.' },
+  { id: 'vitoria',  name: 'Vitória',  role: 'Massoterapeuta',             desc: 'Massagens relaxantes, terapêuticas, drenagem linfática e técnicas especializadas.' },
+  { id: 'thayna',   name: 'Thayna',   role: 'Nutricionista',              desc: 'Avaliação e acompanhamento nutricional personalizado.' },
+];
+
+const SERVICES = {
+  pericles: [{ category: 'Atendimento Masculino', items: [
+    { id:'p1',  name:'Corte de Cabelo',             price:55,  duration:60  },
+    { id:'p2',  name:'Barba com Toalha Quente',     price:55,  duration:60  },
+    { id:'p3',  name:'Barba com Vapor de Ozônio',   price:60,  duration:60  },
+    { id:'p4',  name:'Barba Máquina',               price:40,  duration:30  },
+    { id:'p5',  name:'Acabamento de Corte',         price:25,  duration:30  },
+    { id:'p6',  name:'Tintura de Barba',            price:45,  duration:60  },
+    { id:'p7',  name:'Tintura de Cabelo',           price:90,  duration:90  },
+    { id:'p8',  name:'Sobrancelha na Navalha',      price:35,  duration:30  },
+    { id:'p9',  name:'Depilação Orelha',            price:20,  duration:30  },
+    { id:'p10', name:'Depilação Nariz',             price:20,  duration:30  },
+    { id:'p11', name:'Micropigmentação de Barba',   price:800, duration:180 },
+    { id:'p12', name:'Botox Capilar Curto e Médio', price:150, duration:90  },
+  ]}],
+
+  betina: [
+    { category: 'Estética Facial', items: [
+      { id:'b1',  name:'Limpeza de Pele Profunda',           price:180, duration:90 },
+      { id:'b2',  name:'Hidratação Facial',                  price:60,  duration:60 },
+      { id:'b3',  name:'Brown Lamination',                   price:130, duration:90 },
+      { id:'b4',  name:'Lash Lifting',                       price:130, duration:90 },
+      { id:'b5',  name:'Dermaplaning',                       price:120, duration:60 },
+      { id:'b6',  name:'Hidragloss',                         price:120, duration:60 },
+      { id:'b7',  name:'Design de Sobrancelhas',             price:50,  duration:30 },
+      { id:'b8',  name:'Design de Sobrancelha com Henna',    price:60,  duration:60 },
+      { id:'b9',  name:'Design de Sobrancelha com Tintura',  price:75,  duration:60 },
+      { id:'b10', name:'Depilação Egípcia Facial',           price:85,  duration:60 },
+      { id:'b11', name:'Buço na Linha',                      price:25,  duration:30 },
+      { id:'b12', name:'Buço na Cera',                       price:20,  duration:30 },
+      { id:'b13', name:'Depilação Nariz',                    price:20,  duration:30 },
+      { id:'b14', name:'Cone Chinês',                        price:90,  duration:60 },
+    ]},
+    { category: 'Depilação na Cera — Feminina', items: [
+      { id:'bf1', name:'Axila',             price:40,  duration:30 },
+      { id:'bf2', name:'Meia Perna',        price:45,  duration:30 },
+      { id:'bf3', name:'Perna Completa',    price:90,  duration:60 },
+      { id:'bf4', name:'Buço',              price:20,  duration:30 },
+      { id:'bf5', name:'Facial',            price:70,  duration:60 },
+      { id:'bf6', name:'Virilha + Perianal',price:85,  duration:60 },
+      { id:'bf7', name:'Antebraço',         price:50,  duration:30 },
+      { id:'bf8', name:'Linha Alba',        price:30,  duration:30 },
+    ]},
+    { category: 'Depilação na Cera — Masculina', items: [
+      { id:'bm1', name:'Axila',            price:40,  duration:30 },
+      { id:'bm2', name:'Meia Perna',       price:55,  duration:30 },
+      { id:'bm3', name:'Perna Completa',   price:110, duration:60 },
+      { id:'bm4', name:'Antebraço',        price:60,  duration:30 },
+      { id:'bm5', name:'Costas Completas', price:110, duration:60 },
+      { id:'bm6', name:'Metade das Costas',price:55,  duration:60 },
+      { id:'bm7', name:'Peitoral',         price:55,  duration:60 },
+      { id:'bm8', name:'Abdômen',          price:55,  duration:30 },
+    ]},
+    { category: 'Foto Depilação', items: [
+      { id:'fd1',  name:'Buço',              price:50,  duration:30  },
+      { id:'fd2',  name:'Queixo',            price:50,  duration:30  },
+      { id:'fd3',  name:'Buço + Queixo',     price:70,  duration:60  },
+      { id:'fd4',  name:'Facial',            price:80,  duration:60  },
+      { id:'fd5',  name:'Axila',             price:70,  duration:30  },
+      { id:'fd6',  name:'Virilha',           price:80,  duration:60  },
+      { id:'fd7',  name:'Virilha + Perianal',price:130, duration:90  },
+      { id:'fd8',  name:'Coxa',              price:110, duration:60  },
+      { id:'fd9',  name:'Meia Perna',        price:110, duration:60  },
+      { id:'fd10', name:'Perna Completa',    price:190, duration:120 },
+      { id:'fd11', name:'Antebraço',         price:80,  duration:60  },
+      { id:'fd12', name:'Braço Completo',    price:110, duration:90  },
+      { id:'fd13', name:'Costas Completas',  price:170, duration:120 },
+      { id:'fd14', name:'Abdômen',           price:90,  duration:60  },
+      { id:'fd15', name:'Peitoral',          price:90,  duration:60  },
+    ]},
+    { category: 'Foto Rejuvenescimento', items: [
+      { id:'fr1', name:'Rosto',          price:180, duration:60 },
+      { id:'fr2', name:'Pescoço e Colo', price:180, duration:60 },
+      { id:'fr3', name:'Mãos',           price:150, duration:60 },
+      { id:'fr4', name:'Braços',         price:200, duration:90 },
+    ]},
+  ],
+
+  mary: [
+    { category: 'Micropigmentação', items: [
+      { id:'m1', name:'Micropigmentação de Sobrancelha',           price:650, duration:120 },
+      { id:'m2', name:'Micropigmentação de Olhos (Superior e Inf)',price:750, duration:180 },
+      { id:'m3', name:'Micropigmentação Labial',                   price:750, duration:180 },
+    ]},
+    { category: 'Terapias', items: [
+      { id:'m4', name:'Análise Corporal', price:399.90, duration:60 },
+      { id:'m5', name:'TRG',              price:150,    duration:60 },
+    ]},
+  ],
+
+  vitoria: [{ category: 'Massagens', items: [
+    { id:'v1', name:'Massagem com Vela',           price:160, duration:60 },
+    { id:'v2', name:'Massagem com Pedras Quentes', price:140, duration:60 },
+    { id:'v3', name:'Massagem Relaxante',          price:100, duration:60 },
+    { id:'v4', name:'Massagem Relaxante com Ventosa',price:140,duration:60},
+    { id:'v5', name:'Massagem Terapêutica',        price:180, duration:90 },
+    { id:'v6', name:'Drenagem Linfática',          price:100, duration:60 },
+  ]}],
+
+  thayna: [{ category: 'Nutrição', items: [
+    { id:'t1', name:'Avaliação Nutricional', price:150, duration:60 },
+  ]}],
+};
+
+const MONTHS_PT  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const WEEKDAYS_PT= ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const fmt = p => `R$ ${p.toFixed(2).replace('.',',')}`;
+const fmtDate = d => {
+  if (!d) return '';
+  const days = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+  return `${days[d.getDay()]}, ${d.getDate()} de ${MONTHS_PT[d.getMonth()]}`;
+};
+
+// ══════════════════════════════════════════════════════════════════
+// COMPONENTE — Calendar
+// ══════════════════════════════════════════════════════════════════
+
+function Calendar({ value, onChange }) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const firstDay     = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth  = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const prevMonth = () => viewMonth===0 ? (setViewMonth(11),setViewYear(y=>y-1)) : setViewMonth(m=>m-1);
+  const nextMonth = () => viewMonth===11? (setViewMonth(0), setViewYear(y=>y+1)) : setViewMonth(m=>m+1);
+  const cells = [];
+  for (let i=0;i<firstDay;i++) cells.push(null);
+  for (let d=1;d<=daysInMonth;d++) cells.push(d);
+  return (
+    <div className="calendar-wrap">
+      <div className="cal-header">
+        <button className="cal-nav" onClick={prevMonth}>‹</button>
+        <span className="cal-title">{MONTHS_PT[viewMonth]} {viewYear}</span>
+        <button className="cal-nav" onClick={nextMonth}>›</button>
+      </div>
+      <div className="cal-weekdays">{WEEKDAYS_PT.map(w=><div key={w} className="cal-weekday">{w}</div>)}</div>
+      <div className="cal-days">
+        {cells.map((d,i) => {
+          if (!d) return <div key={`e${i}`} className="cal-day empty"/>;
+          const date     = new Date(viewYear, viewMonth, d);
+          const disabled = date.getDay()===0 || date<today;
+          const isToday  = date.getTime()===today.getTime();
+          const isSel    = value && value.getTime()===date.getTime();
+          return (
+            <div key={d}
+              className={`cal-day${disabled?' disabled':''}${isToday?' today':''}${isSel?' selected':''}`}
+              onClick={() => !disabled && onChange(date)}
+            >{d}</div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// COMPONENTE — TimeSlots
+// Carrega horários reais do Supabase e bloqueia slots considerando
+// a duração total do agendamento
+// ══════════════════════════════════════════════════════════════════
+
+function TimeSlots({ attendantId, date, value, onChange, totalDuration }) {
+  const [takenSlots, setTakenSlots] = useState(new Set());
+  const [loading, setLoading]       = useState(false);
+
+  useEffect(() => {
+    if (!date || !attendantId) return;
+    setLoading(true);
+    setTakenSlots(new Set());
+    loadTakenSlots(attendantId, date)
+      .then(s => { setTakenSlots(s); setLoading(false); })
+      .catch(()=> setLoading(false));
+  }, [attendantId, date]);
+
+  const morning=[], afternoon=[];
+  for (let h=8;h<20;h++) for (let m of [0,30]) {
+    if(h===19&&m===30) continue;
+    const lbl=`${h}:${m===0?'00':'30'}`;
+    (h<12?morning:afternoon).push(lbl);
+  }
+
+  const Slot = ({ t }) => {
+    const avail = isAvailable(t, takenSlots, totalDuration);
+    const isSel = value===t;
+    return (
+      <div
+        className={`time-slot${!avail?' taken':''}${isSel?' selected':''}`}
+        title={!avail ? 'Horário indisponível para a duração do serviço' : ''}
+        onClick={() => avail && onChange(t)}
+      >{t}</div>
+    );
+  };
+
+  if (loading) return (
+    <div className="loading-row">
+      <div className="spinner"/>
+      Verificando disponibilidade…
+    </div>
+  );
+
+  const morningAvail    = morning.filter(t    => isAvailable(t,    takenSlots, totalDuration));
+  const afternoonAvail  = afternoon.filter(t  => isAvailable(t,    takenSlots, totalDuration));
+  const totalAvail      = morningAvail.length + afternoonAvail.length;
+
+  if (totalAvail === 0) return (
+    <div className="no-slots-msg">
+      Nenhum horário disponível para esta data com duração de {fmtDuration(totalDuration)}.<br/>
+      Tente outra data.
+    </div>
+  );
+
+  return (
+    <div>
+      {morningAvail.length > 0 && <>
+        <div className="time-section-label">Manhã</div>
+        <div className="time-slots">{morning.map(t=><Slot key={t} t={t}/>)}</div>
+      </>}
+      {afternoonAvail.length > 0 && <>
+        <div className="time-section-label">Tarde</div>
+        <div className="time-slots">{afternoon.map(t=><Slot key={t} t={t}/>)}</div>
+      </>}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+// APP
+// ══════════════════════════════════════════════════════════════════
+
+function App() {
+  const [step,       setStep]      = useState(1);
+  const [booking,    setBooking]   = useState({ attendant:null, services:[], date:null, time:null, clientName:'', clientPhone:'' });
+  const [bookingRec, setBookingRec]= useState(null); // registro salvo no Supabase
+  const [key,        setKey]       = useState(0);
+  const [submitting, setSubmitting]= useState(false);
+  const [submitErr,  setSubmitErr] = useState('');
+
+  const go   = n => { setKey(k=>k+1); setStep(n); };
+  const next = ()  => go(step+1);
+  const back = ()  => go(step-1);
+  const set  = (f,v) => setBooking(b=>({...b,[f]:v}));
+
+  const totalPrice    = useMemo(()=> booking.services.reduce((a,s)=>a+s.price,0), [booking.services]);
+  const totalDuration = useMemo(()=> booking.services.reduce((a,s)=>a+s.duration,0), [booking.services]);
+  const serviceNames  = useMemo(()=> booking.services.map(s=>s.name).join(', '), [booking.services]);
+
+  const buildWhatsApp = (rec) => {
+    const id = rec?.id ? `\n*Código:* ${rec.id.toString().slice(0,8).toUpperCase()}` : '';
+    const msg = encodeURIComponent(
+      `Olá! Realizei um *pré-agendamento* e gostaria de confirmar:${id}\n\n` +
+      `*Nome:* ${booking.clientName}\n` +
+      `*WhatsApp:* ${booking.clientPhone}\n` +
+      `*Serviço(s):* ${serviceNames}\n` +
+      `*Atendente:* ${booking.attendant?.name}\n` +
+      `*Data:* ${fmtDate(booking.date)}\n` +
+      `*Horário:* ${booking.time}h\n` +
+      `*Duração estimada:* ${fmtDuration(totalDuration)}\n` +
+      `*Valor:* ${fmt(totalPrice)}\n`
+    );
+    return `https://wa.me/${CONFIG.whatsapp}?text=${msg}`;
+  };
+
+  const handleConfirm = async () => {
+    setSubmitting(true);
+    setSubmitErr('');
+    try {
+      const slots = getSlotsNeeded(booking.time, totalDuration);
+      const rec   = await saveBooking(booking, slots, totalDuration, totalPrice, serviceNames);
+      setBookingRec(rec);
+      go(6);
+    } catch (e) {
+      console.error(e);
+      setSubmitErr('Erro ao salvar o agendamento. Verifique sua conexão e tente novamente.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const stepTitles = [
+    { label:'Escolha o Atendente',  sub:'Selecione o profissional para o seu atendimento' },
+    { label:'Escolha o Serviço',    sub:`Serviços disponíveis com ${booking.attendant?.name||''}` },
+    { label:'Escolha a Data',       sub:'Segunda a sábado, das 8h às 20h' },
+    { label:'Escolha o Horário',    sub: booking.date ? `${fmtDate(booking.date)} · duração estimada: ${fmtDuration(totalDuration)}` : '' },
+    { label:'Seus Dados',           sub:'Informe seu nome e WhatsApp para confirmar' },
+    { label:'Agendamento Registrado!', sub:'' },
+  ];
+  const cfg = stepTitles[step-1];
+
+  const dot = (
+    <span className="confirm-detail-icon">
+      <svg width="6" height="6" viewBox="0 0 6 6"><circle cx="3" cy="3" r="3" fill="currentColor"/></svg>
+    </span>
+  );
+
+  return (
+    <div style={{display:'flex'}}>
+      <main className="main">
+
+        {step < 6 && (
+          <div className="main-header">
+            <h1 className="main-title">{cfg.label}</h1>
+            {cfg.sub && <p className="main-subtitle">{cfg.sub}</p>}
+          </div>
+        )}
+
+        <div className="main-body">
+          <div key={key} className="fade-enter">
+
+            {/* ─── STEP 1 — Atendente ─── */}
+            {step===1 && (
+              <div className="cards-grid cards-grid-2">
+                {DEMO_MODE && (
+                  <div className="demo-banner" style={{gridColumn:'1/-1'}}>
+                    <strong>Modo demonstração</strong> — Supabase não configurado. Os agendamentos não serão salvos. Configure as variáveis <code>supabaseUrl</code> e <code>supabaseKey</code> no arquivo HTML.
+                  </div>
+                )}
+                {ATTENDANTS.map(a=>(
+                  <div key={a.id}
+                    className={`card${booking.attendant?.id===a.id?' selected':''}`}
+                    onClick={()=>{ set('attendant',a); set('services',[]); setTimeout(()=>go(2),120); }}
+                  >
+                    <div className="card-name">{a.name}</div>
+                    <div className="card-role">{a.role}</div>
+                    <div className="card-desc">{a.desc}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ─── STEP 2 — Serviços ─── */}
+            {step===2 && booking.attendant && (
+              <div>
+                {booking.services.length>0 && (
+                  <div className="duration-bar">
+                    <span className="duration-bar-label">Total selecionado:</span>
+                    <span className="duration-bar-value">{fmt(totalPrice)}</span>
+                    <span className="duration-bar-label" style={{marginLeft:'auto'}}>Duração estimada:</span>
+                    <span className="duration-bar-value">{fmtDuration(totalDuration)}</span>
+                  </div>
+                )}
+                {SERVICES[booking.attendant.id].map(cat=>(
+                  <div key={cat.category} className="service-category">
+                    <div className="service-category-title">{cat.category}</div>
+                    {cat.items.map(item=>{
+                      const sel = booking.services.some(s=>s.id===item.id);
+                      return (
+                        <div key={item.id}
+                          className={`service-item${sel?' selected':''}`}
+                          onClick={()=>set('services', sel
+                            ? booking.services.filter(s=>s.id!==item.id)
+                            : [...booking.services, item]
+                          )}
+                        >
+                          <div className="service-item-info">
+                            <div className="service-item-name">{item.name}</div>
+                            <div className="service-item-dur">{fmtDuration(item.duration)}</div>
+                          </div>
+                          <span className="service-item-price">{fmt(item.price)}</span>
+                          <div className="service-item-check">{sel?'✓':''}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+                <div className="btn-row">
+                  <button className="btn btn-ghost" onClick={back}>← Voltar</button>
+                  <button className="btn btn-primary" disabled={!booking.services.length} onClick={next}>Continuar →</button>
+                </div>
+              </div>
+            )}
+
+            {/* ─── STEP 3 — Data ─── */}
+            {step===3 && (
+              <div>
+                <Calendar value={booking.date} onChange={d=>{ set('date',d); set('time',null); }}/>
+                <div className="btn-row">
+                  <button className="btn btn-ghost" onClick={back}>← Voltar</button>
+                  <button className="btn btn-primary" disabled={!booking.date} onClick={next}>Continuar →</button>
+                </div>
+              </div>
+            )}
+
+            {/* ─── STEP 4 — Horário ─── */}
+            {step===4 && (
+              <div>
+                <TimeSlots
+                  attendantId={booking.attendant?.id}
+                  date={booking.date}
+                  value={booking.time}
+                  onChange={t=>set('time',t)}
+                  totalDuration={totalDuration}
+                />
+                <div className="btn-row">
+                  <button className="btn btn-ghost" onClick={back}>← Voltar</button>
+                  <button className="btn btn-primary" disabled={!booking.time} onClick={next}>Continuar →</button>
+                </div>
+              </div>
+            )}
+
+            {/* ─── STEP 5 — Dados do cliente ─── */}
+            {step===5 && (
+              <div className="form-max">
+                <div className="summary-box">
+                  <div className="summary-box-title">Resumo do Agendamento</div>
+                  {[
+                    ['Atendente',    `${booking.attendant?.name} — ${booking.attendant?.role}`],
+                    ['Serviço(s)',   serviceNames],
+                    ['Data',         fmtDate(booking.date)],
+                    ['Horário',      `${booking.time}h`],
+                    ['Duração',      fmtDuration(totalDuration)],
+                    ['Valor total',  fmt(totalPrice), true],
+                  ].map(([label,value,gold])=>(
+                    <div key={label} className="summary-row">
+                      <span className="summary-row-label" style={{color:'#fff'}}>{label}</span>
+                      <span className="summary-row-value" style={gold?{color:'var(--gold)'}:{}}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {submitErr && <div className="error-box">{submitErr}</div>}
+
+                <div className="form-field">
+                  <label className="form-label">Seu Nome</label>
+                  <input className="form-input" type="text" placeholder="Como você se chama?"
+                    value={booking.clientName} onChange={e=>set('clientName',e.target.value)}/>
+                </div>
+                <div className="form-field">
+                  <label className="form-label">WhatsApp</label>
+                  <input className="form-input" type="tel" placeholder="(46) 9 9999-9999"
+                    value={booking.clientPhone} onChange={e=>set('clientPhone',e.target.value)}/>
+                </div>
+                <div className="btn-row">
+                  <button className="btn btn-ghost" onClick={back} disabled={submitting}>← Voltar</button>
+                  <button className="btn btn-primary"
+                    disabled={!booking.clientName.trim()||!booking.clientPhone.trim()||submitting}
+                    onClick={handleConfirm}
+                  >
+                    {submitting
+                      ? <><div className="spinner" style={{borderTopColor:'#0a0a0a',borderColor:'rgba(0,0,0,0.2)'}}/> Salvando…</>
+                      : 'Confirmar Agendamento →'
+                    }
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ─── STEP 6 — Confirmação ─── */}
+            {step===6 && (
+              <div className="confirm-screen">
+                <div className="confirm-icon">✓</div>
+
+                <div className="status-badge status-pending">Aguardando confirmação</div>
+
+                <h1 className="confirm-title">Pré-agendamento Registrado!</h1>
+                <p className="confirm-subtitle">
+                  Obrigado, <strong>{booking.clientName}</strong>! Seu horário foi reservado com status <em>pendente</em>.
+                  Clique no botão abaixo para enviar a mensagem de confirmação pelo WhatsApp — a barbearia validará o agendamento em seguida.
+                </p>
+
+                {bookingRec?.id && !DEMO_MODE && (
+                  <p className="booking-id-row">
+                    Código: <span className="booking-id">{bookingRec.id.toString().slice(0,8).toUpperCase()}</span>
+                  </p>
+                )}
+                {DEMO_MODE && (
+                  <p className="booking-id-row" style={{color:'var(--gold)',marginTop:'4px'}}>
+                    Modo demo — agendamento não salvo no banco de dados.
+                  </p>
+                )}
+
+                <div className="confirm-card" style={{marginTop:'32px'}}>
+                  <div className="confirm-card-header">Detalhes do Agendamento</div>
+                  {[
+                    {label:'Cliente',    value: booking.clientName},
+                    {label:'WhatsApp',   value: booking.clientPhone},
+                    {label:'Serviço(s)', value: serviceNames},
+                    {label:'Atendente',  value: `${booking.attendant?.name} — ${booking.attendant?.role}`},
+                    {label:'Data',       value: fmtDate(booking.date)},
+                    {label:'Horário',    value: `${booking.time}h`},
+                    {label:'Duração',    value: fmtDuration(totalDuration)},
+                    {label:'Valor',      value: fmt(totalPrice), gold:true},
+                  ].map(row=>(
+                    <div key={row.label} className="confirm-detail">
+                      {dot}
+                      <div>
+                        <span className="confirm-detail-label">{row.label}</span>
+                        <span className="confirm-detail-value" style={row.gold?{color:'var(--gold)'}:{}}>{row.value}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{display:'flex',gap:'16px',flexWrap:'wrap',justifyContent:'center'}}>
+                  <a href={buildWhatsApp(bookingRec)} target="_blank" rel="noopener noreferrer">
+                    <button className="btn btn-whatsapp">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347"/>
+                      </svg>
+                      Confirmar pelo WhatsApp
+                    </button>
+                  </a>
+                  <button className="btn btn-ghost" onClick={()=>{
+                    setBooking({attendant:null,services:[],date:null,time:null,clientName:'',clientPhone:''});
+                    setBookingRec(null); setSubmitErr(''); go(1);
+                  }}>
+                    Novo Agendamento
+                  </button>
+                </div>
+
+                <p style={{marginTop:'32px',fontSize:'12px',color:'var(--text-dim)',textAlign:'center',lineHeight:'1.6'}}>
+                  Rua Tocantins, 2396 — Sala 1 — Centro, Pato Branco — PR<br/>
+                  Segunda a Sábado · 08h às 20h
+                </p>
+              </div>
+            )}
+
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('agendamento-root')).render(<App/>);
+
+</script>
